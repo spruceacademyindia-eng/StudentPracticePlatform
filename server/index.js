@@ -15,23 +15,47 @@ const app = express();
 app.use(helmet());
 
 // ── CORS Configuration ──
-const allowedOrigins = [
+const rawAllowedOrigins = [
   process.env.CLIENT_URL,
+  'https://student-practice-platform-pi.vercel.app',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
 ].filter(Boolean);
+
+// Normalize (strip trailing slashes)
+const allowedOrigins = rawAllowedOrigins.map((url) => url.replace(/\/+$/, ''));
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, Render health checks)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      // In development, allow all
-      if (process.env.NODE_ENV !== 'production') return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+
+      // Check explicit allowed origins
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      // Automatically allow all Vercel deployment URLs for this app (including previews)
+      if (
+        normalizedOrigin.endsWith('.vercel.app') &&
+        normalizedOrigin.includes('student-practice-platform')
+      ) {
+        return callback(null, true);
+      }
+
+      // In non-production, allow all
+      if (process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+
       return callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 
