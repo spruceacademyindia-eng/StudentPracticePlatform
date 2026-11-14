@@ -3,6 +3,20 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, contentService, categoryService, type TypingContent, type Category } from '@/lib/services';
 import AdminNav from '@/components/AdminNav';
+import {
+  Sparkles,
+  Activity,
+  Calendar,
+  Stethoscope,
+  FlaskConical,
+  FileText,
+  Layers,
+} from 'lucide-react';
+import {
+  CLINICAL_PRESETS,
+  ClinicalDischargeForm,
+  compileDischargeSummaryText,
+} from '@/lib/clinicalTemplates';
 
 type ContentForm = {
   title: string;
@@ -51,6 +65,97 @@ export default function AdminContentPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Dynamic Clinical Discharge Summary State
+  const defaultClinical = CLINICAL_PRESETS.orthopedic_spine;
+  const [dischargeSummarySelected, setDischargeSummarySelected] = useState(false);
+  const [clinicalTab, setClinicalTab] = useState<'encounter' | 'diagnoses' | 'labs' | 'course' | 'safety'>('encounter');
+  const [clinicalForm, setClinicalForm] = useState<ClinicalDischargeForm>({
+    preset: 'orthopedic_spine',
+    title: defaultClinical.title || 'Clinical Discharge Summary',
+    hospitalName: defaultClinical.hospitalName || 'Ace Discharge Summary',
+    dateOfService: defaultClinical.dateOfService || '',
+    admitDate: defaultClinical.admitDate || '',
+    dischargeDate: defaultClinical.dischargeDate || '',
+    admittingDiagnosis: defaultClinical.admittingDiagnosis || '',
+    dischargeDiagnosis: defaultClinical.dischargeDiagnosis || '',
+    secondaryDiagnoses: defaultClinical.secondaryDiagnoses || '',
+    attendingMD: defaultClinical.attendingMD || '',
+    consultations: defaultClinical.consultations || '',
+    labsImaging: defaultClinical.labsImaging || '',
+    cardiacEcho: defaultClinical.cardiacEcho || '',
+    cxr: defaultClinical.cxr || '',
+    labPanels: defaultClinical.labPanels || '',
+    hospitalCourse: defaultClinical.hospitalCourse || '',
+    mode: 'BOTH',
+    difficulty: 'HARD',
+    targetWPM: 35,
+    minimumAccuracy: 85,
+  });
+
+  const updateClinicalField = (field: keyof ClinicalDischargeForm, value: any) => {
+    const updated = { ...clinicalForm, [field]: value };
+    setClinicalForm(updated);
+    const compiled = compileDischargeSummaryText(updated);
+    setForm((prev) => ({
+      ...prev,
+      title: updated.title,
+      content: compiled,
+      targetWPM: updated.targetWPM,
+      minimumAccuracy: updated.minimumAccuracy,
+      difficulty: updated.difficulty,
+      mode: updated.mode,
+    }));
+  };
+
+  const handleClinicalPresetChange = (presetKey: string) => {
+    if (presetKey === 'blank') {
+      const blankData: ClinicalDischargeForm = {
+        preset: 'blank',
+        title: 'Clinical Discharge Summary',
+        hospitalName: 'Ace Discharge Summary',
+        dateOfService: '',
+        admitDate: '',
+        dischargeDate: '',
+        admittingDiagnosis: '',
+        dischargeDiagnosis: '',
+        secondaryDiagnoses: '',
+        attendingMD: '',
+        consultations: 'none',
+        labsImaging: '',
+        cardiacEcho: '',
+        cxr: '',
+        labPanels: '',
+        hospitalCourse: '',
+        mode: 'BOTH',
+        difficulty: 'HARD',
+        targetWPM: 35,
+        minimumAccuracy: 85,
+      };
+      setClinicalForm(blankData);
+      setForm((prev) => ({
+        ...prev,
+        title: blankData.title,
+        content: compileDischargeSummaryText(blankData),
+      }));
+      return;
+    }
+
+    const preset = CLINICAL_PRESETS[presetKey];
+    if (preset) {
+      const merged = { ...clinicalForm, ...preset, preset: presetKey } as ClinicalDischargeForm;
+      setClinicalForm(merged);
+      setForm((prev) => ({
+        ...prev,
+        title: merged.title || prev.title,
+        content: compileDischargeSummaryText(merged),
+        targetWPM: merged.targetWPM || prev.targetWPM,
+        minimumAccuracy: merged.minimumAccuracy || prev.minimumAccuracy,
+        difficulty: merged.difficulty || prev.difficulty,
+        mode: merged.mode || prev.mode,
+      }));
+    }
+  };
+
   useEffect(() => {
     if (!authService.isAuthenticated()) {
       router.push('/admin/login');
@@ -98,9 +203,13 @@ export default function AdminContentPage() {
 
   const openCreateModal = () => {
     setEditingItem(null);
+    const defaultCat = categories.length > 0 ? categories[0]._id : '';
+    const isDischarge = categories.length > 0 && categories[0].name.toLowerCase().includes('discharge summary');
+    setDischargeSummarySelected(isDischarge);
     setForm({
       ...EMPTY_FORM,
-      category: categories.length > 0 ? categories[0]._id : '',
+      category: defaultCat,
+      content: isDischarge ? compileDischargeSummaryText(clinicalForm) : '',
     });
     setError('');
     setShowModal(true);
@@ -108,11 +217,18 @@ export default function AdminContentPage() {
 
   const openEditModal = (item: TypingContent) => {
     setEditingItem(item);
+    const catId = item.category && typeof item.category === 'object' ? item.category._id : item.category;
+    const catName = item.category && typeof item.category === 'object' ? item.category.name : '';
+    const isDischarge =
+      catName.toLowerCase().includes('discharge summary') ||
+      item.title.toLowerCase().includes('discharge summary') ||
+      item.content.includes('DISCHARGE SUMMARY:');
+    setDischargeSummarySelected(isDischarge);
     setForm({
       title: item.title,
       description: item.description || '',
       content: item.content,
-      category: item.category && typeof item.category === 'object' ? item.category._id : item.category,
+      category: catId,
       subcategory: typeof item.subcategory === 'object' && item.subcategory ? item.subcategory._id : '',
       mode: item.mode,
       difficulty: item.difficulty,
@@ -371,13 +487,30 @@ export default function AdminContentPage() {
           )}
         </div>
 
-        {/* Create / Edit Modal */}
+        {/* Create / Edit Modal (Unified for Standard Passages & Dynamic Discharge Summaries) */}
         {showModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-lg)', padding: '2rem', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 className="text-h3" style={{ color: '#fff', marginBottom: '1.25rem' }}>
-                {editingItem ? 'Edit Typing Passage' : 'Create New Typing Passage'}
-              </h3>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+            <div style={{ backgroundColor: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-lg)', padding: '2rem', width: '100%', maxWidth: dischargeSummarySelected ? '1180px' : '680px', maxHeight: '92vh', overflowY: 'auto', transition: 'max-width 200ms ease' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 className="text-h3" style={{ color: '#fff', margin: 0 }}>
+                  {editingItem ? 'Edit Typing Passage' : 'Create New Typing Passage'}
+                </h3>
+                {dischargeSummarySelected && (
+                  <span
+                    style={{
+                      backgroundColor: 'rgba(0, 197, 162, 0.15)',
+                      color: 'var(--color-accent2, #00c5a2)',
+                      border: '1px solid var(--color-accent2, #00c5a2)',
+                      borderRadius: '20px',
+                      padding: '0.2rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Discharge Summary Mode Active
+                  </span>
+                )}
+              </div>
 
               {error && (
                 <div style={{ backgroundColor: 'rgba(229, 62, 62, 0.15)', border: '1px solid #e53e3e', color: '#fc8181', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.875rem' }}>
@@ -411,14 +544,61 @@ export default function AdminContentPage() {
                       className="input input-admin"
                       style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'var(--admin-border)' }}
                       value={form.category}
-                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      onChange={(e) => {
+                        const catId = e.target.value;
+                        const cat = categories.find((c) => c._id === catId);
+                        const isDischarge = cat?.name?.toLowerCase().includes('discharge summary') || false;
+                        setDischargeSummarySelected(isDischarge);
+                        if (isDischarge) {
+                          setForm((prev) => ({
+                            ...prev,
+                            category: catId,
+                            content: compileDischargeSummaryText(clinicalForm),
+                            title: prev.title || clinicalForm.title,
+                          }));
+                        } else {
+                          setForm((prev) => ({ ...prev, category: catId }));
+                        }
+                      }}
                     >
-                      {categories.map((c) => (
-                        <option key={c._id} value={c._id} style={{ color: '#000' }}>{c.name}</option>
-                      ))}
+                      {categories.map((c) => {
+                        const isSub = !!c.parentCategory;
+                        return (
+                          <option key={c._id} value={c._id} style={{ color: '#000', fontWeight: isSub ? 'normal' : 'bold' }}>
+                            {isSub ? `  ↳ ${c.name}` : c.name}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--admin-muted)', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
+                      Content Format
+                    </label>
+                    <select
+                      className="input input-admin"
+                      style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'var(--admin-border)' }}
+                      value={dischargeSummarySelected ? 'DISCHARGE' : 'STANDARD'}
+                      onChange={(e) => {
+                        const isDischarge = e.target.value === 'DISCHARGE';
+                        setDischargeSummarySelected(isDischarge);
+                        if (isDischarge) {
+                          setForm((prev) => ({
+                            ...prev,
+                            content: compileDischargeSummaryText(clinicalForm),
+                            title: prev.title || clinicalForm.title,
+                          }));
+                        }
+                      }}
+                    >
+                      <option value="STANDARD" style={{ color: '#000' }}>Standard Freeform Text</option>
+                      <option value="DISCHARGE" style={{ color: '#000' }}>Discharge Summary Typing (Structured Clinical Report)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', color: 'var(--admin-muted)', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
                       Mode *
@@ -434,9 +614,7 @@ export default function AdminContentPage() {
                       <option value="CHALLENGE" style={{ color: '#000' }}>Challenge Only</option>
                     </select>
                   </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', color: 'var(--admin-muted)', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
                       Difficulty
@@ -468,42 +646,317 @@ export default function AdminContentPage() {
                       onChange={(e) => setForm({ ...form, targetWPM: Number(e.target.value) })}
                     />
                   </div>
+                </div>
 
+                {/* DYNAMIC SECTION: Either Discharge Summary Clinical Form OR Standard Textarea */}
+                {dischargeSummarySelected ? (
+                  <div
+                    style={{
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      padding: '1.25rem',
+                      backgroundColor: '#0f172a',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                    }}
+                  >
+                    {/* Preset Picker Dropdown */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#93c5fd', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Sparkles size={15} style={{ color: '#38bdf8' }} /> Clinical Report Template Presets:
+                      </span>
+                      <select
+                        value={clinicalForm.preset}
+                        onChange={(e) => handleClinicalPresetChange(e.target.value)}
+                        style={{
+                          backgroundColor: '#1e293b',
+                          color: '#ffffff',
+                          border: '1px solid #475569',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.75rem',
+                          fontSize: '0.82rem',
+                          outline: 'none',
+                        }}
+                      >
+                        <option value="orthopedic_spine">Orthopedic & Spine (Spinal Stenosis & Compression Fracture) [Image Preset]</option>
+                        <option value="cardiology_acs">Cardiology (ACS, Stent & Cath Lab)</option>
+                        <option value="pulmonology_copd">Pulmonology (COPD Exacerbation & CXR)</option>
+                        <option value="blank">Custom / Blank Report</option>
+                      </select>
+                    </div>
+
+                    {/* Split Layout: Form Inputs on Left, Real-Time Paper Preview on Right */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
+                      {/* Left: Section Tabs & Clinical Fields */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>
+                          {[
+                            { id: 'encounter', label: 'Encounter', icon: <Calendar size={12} /> },
+                            { id: 'diagnoses', label: 'Diagnoses', icon: <Stethoscope size={12} /> },
+                            { id: 'labs', label: 'Imaging & Labs', icon: <FlaskConical size={12} /> },
+                            { id: 'course', label: 'Hospital Course', icon: <FileText size={12} /> },
+                            { id: 'safety', label: 'Facility & Footer', icon: <Layers size={12} /> },
+                          ].map((tab) => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => setClinicalTab(tab.id as any)}
+                              style={{
+                                backgroundColor: clinicalTab === tab.id ? '#044C94' : 'rgba(255,255,255,0.05)',
+                                color: clinicalTab === tab.id ? '#fff' : '#94a3b8',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '0.3rem 0.55rem',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                fontWeight: clinicalTab === tab.id ? 700 : 500,
+                              }}
+                            >
+                              {tab.icon} {tab.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Encounter Tab */}
+                        {clinicalTab === 'encounter' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Date of Service</label>
+                                <input
+                                  type="text"
+                                  value={clinicalForm.dateOfService}
+                                  onChange={(e) => updateClinicalField('dateOfService', e.target.value)}
+                                  placeholder="e.g. 01/12/2026 or blank"
+                                  style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Admit Date</label>
+                                <input
+                                  type="text"
+                                  value={clinicalForm.admitDate}
+                                  onChange={(e) => updateClinicalField('admitDate', e.target.value)}
+                                  placeholder="e.g. 01/06/2026 or blank"
+                                  style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Discharge Date</label>
+                                <input
+                                  type="text"
+                                  value={clinicalForm.dischargeDate}
+                                  onChange={(e) => updateClinicalField('dischargeDate', e.target.value)}
+                                  placeholder="e.g. 01/12/2026 or blank"
+                                  style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                                />
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Attending MD</label>
+                                <input
+                                  type="text"
+                                  value={clinicalForm.attendingMD}
+                                  onChange={(e) => updateClinicalField('attendingMD', e.target.value)}
+                                  style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Consultations</label>
+                                <input
+                                  type="text"
+                                  value={clinicalForm.consultations}
+                                  onChange={(e) => updateClinicalField('consultations', e.target.value)}
+                                  style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Diagnoses Tab */}
+                        {clinicalTab === 'diagnoses' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Admitting Diagnosis</label>
+                              <input
+                                type="text"
+                                value={clinicalForm.admittingDiagnosis}
+                                onChange={(e) => updateClinicalField('admittingDiagnosis', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Discharge Diagnosis / Condition</label>
+                              <textarea
+                                rows={2}
+                                value={clinicalForm.dischargeDiagnosis}
+                                onChange={(e) => updateClinicalField('dischargeDiagnosis', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Secondary Diagnoses</label>
+                              <textarea
+                                rows={2}
+                                value={clinicalForm.secondaryDiagnoses}
+                                onChange={(e) => updateClinicalField('secondaryDiagnoses', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Labs & Imaging Tab */}
+                        {clinicalTab === 'labs' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Labs/Imaging (CT Head, Spine, etc.)</label>
+                              <textarea
+                                rows={3}
+                                value={clinicalForm.labsImaging}
+                                onChange={(e) => updateClinicalField('labsImaging', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Cardiac Echo Findings</label>
+                              <textarea
+                                rows={2}
+                                value={clinicalForm.cardiacEcho}
+                                onChange={(e) => updateClinicalField('cardiacEcho', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>CXR (Chest X-Ray) Serial Reports</label>
+                              <textarea
+                                rows={2}
+                                value={clinicalForm.cxr}
+                                onChange={(e) => updateClinicalField('cxr', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Lab Panels (CBC, BMP, Urinalysis)</label>
+                              <textarea
+                                rows={2}
+                                value={clinicalForm.labPanels}
+                                onChange={(e) => updateClinicalField('labPanels', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Hospital Course Tab */}
+                        {clinicalTab === 'course' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Hospital Course & Narrative Disposition</label>
+                              <textarea
+                                rows={6}
+                                value={clinicalForm.hospitalCourse}
+                                onChange={(e) => updateClinicalField('hospitalCourse', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.82rem', lineHeight: 1.5 }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Facility & Footer Tab */}
+                        {clinicalTab === 'safety' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Hospital Chart Name (Footer Box)</label>
+                              <input
+                                type="text"
+                                value={clinicalForm.hospitalName}
+                                onChange={(e) => updateClinicalField('hospitalName', e.target.value)}
+                                style={{ width: '100%', padding: '0.4rem', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.8rem' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Real-Time Live Medical Paper Preview */}
+                      <div
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          height: '380px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569' }}>
+                            Live Clinical Paper Preview
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: '4px',
+                              backgroundColor: liveWordCount >= 300 && liveWordCount <= 1000 ? '#dcfce7' : '#fee2e2',
+                              color: liveWordCount >= 300 && liveWordCount <= 1000 ? '#15803d' : '#b91c1c',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {liveWordCount} Words (Target: 300–1,000)
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
+                            padding: '1rem',
+                            fontFamily: 'Consolas, monospace',
+                            fontSize: '0.78rem',
+                            lineHeight: 1.6,
+                            color: '#1e293b',
+                            overflowY: 'auto',
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {form.content || 'Report will preview here...'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <div>
-                    <label style={{ display: 'block', color: 'var(--admin-muted)', marginBottom: '0.4rem', fontSize: '0.875rem' }}>
-                      Min Accuracy %
-                    </label>
-                    <input
-                      type="number"
-                      min={50}
-                      max={100}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <label style={{ color: 'var(--admin-muted)', fontSize: '0.875rem' }}>
+                        Paragraph Content *
+                      </label>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-accent1)' }}>
+                        {liveWordCount} words / {liveCharCount} characters
+                      </span>
+                    </div>
+                    <textarea
+                      rows={6}
+                      required
                       className="input input-admin"
-                      style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'var(--admin-border)' }}
-                      value={form.minimumAccuracy}
-                      onChange={(e) => setForm({ ...form, minimumAccuracy: Number(e.target.value) })}
+                      style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'var(--admin-border)', resize: 'vertical', fontFamily: 'Consolas, monospace', fontSize: '0.9rem' }}
+                      placeholder="Paste the passage text for typing evaluation..."
+                      value={form.content}
+                      onChange={(e) => setForm({ ...form, content: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                    <label style={{ color: 'var(--admin-muted)', fontSize: '0.875rem' }}>
-                      Paragraph Content *
-                    </label>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-accent1)' }}>
-                      {liveWordCount} words / {liveCharCount} characters
-                    </span>
-                  </div>
-                  <textarea
-                    rows={6}
-                    required
-                    className="input input-admin"
-                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'var(--admin-border)', resize: 'vertical', fontFamily: 'Consolas, monospace', fontSize: '0.9rem' }}
-                    placeholder="Paste the passage text for typing evaluation..."
-                    value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                  />
-                </div>
+                )}
 
                 <div>
                   <label style={{ display: 'block', color: 'var(--admin-muted)', marginBottom: '0.4rem', fontSize: '0.875rem' }}>

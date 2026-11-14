@@ -10,7 +10,9 @@ import {
   type TypingContent,
 } from '@/lib/services';
 import Navbar from '@/components/Navbar';
-import { RotateCcw, ClipboardList, Check, Play, Lightbulb, CheckCircle } from 'lucide-react';
+import { RotateCcw, ClipboardList, Check, Play, Lightbulb, CheckCircle, FileText } from 'lucide-react';
+import ClinicalDocumentView from '@/components/ClinicalDocumentView';
+import { isDischargeSummaryContent } from '@/lib/clinicalTemplates';
 
 type CharState = 'idle' | 'correct' | 'wrong' | 'current';
 
@@ -34,6 +36,7 @@ export default function FreePracticePage() {
   const [liveAccuracy, setLiveAccuracy] = useState(100);
   const [submitting, setSubmitting] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
+  const [chartViewMode, setChartViewMode] = useState<'CHART' | 'MONO'>('CHART');
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -654,116 +657,155 @@ export default function FreePracticePage() {
               }}
             >
               {/* Left Column: Reference Passage (Target Content) */}
-              <div
-                className="card shadow-md"
-                style={{
-                  padding: '1.5rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  backgroundColor: '#ffffff',
-                  height: '540px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '1rem',
-                    paddingBottom: '0.75rem',
-                    borderBottom: '1px solid #edf2f7',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-muted)', letterSpacing: '0.05em' }}>
-                      Reference Passage
-                    </span>
-                    <h2 className="text-h3" style={{ color: 'var(--color-secondary)', marginTop: '0.15rem' }}>
-                      {selectedContent.title}
-                    </h2>
+              {isDischargeSummaryContent(selectedContent.title, selectedContent.content) && chartViewMode === 'CHART' ? (
+                <div style={{ height: '540px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setChartViewMode('MONO')}
+                      className="btn btn-sm btn-ghost"
+                      style={{ fontSize: '0.72rem', color: '#64748b' }}
+                    >
+                      Switch to Clean Monospace View →
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <span className="badge badge-teal">
-                      {selectedContent.category && typeof selectedContent.category === 'object' ? selectedContent.category.name : 'Category'}
-                    </span>
-                    <span className="badge badge-accent">
-                      {selectedContent.wordCount} words
-                    </span>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <ClinicalDocumentView
+                      content={selectedContent.content}
+                      charStates={charStates}
+                      title={selectedContent.title}
+                      studentName="Candidate Student"
+                      targetWPM={selectedContent.targetWPM || 35}
+                      mode="PRACTICE"
+                      containerRef={contentContainerRef}
+                      activeCharRef={activeCharRef}
+                      onContainerClick={() => inputRef.current?.focus()}
+                      hospitalName="Ace Discharge Summary"
+                    />
                   </div>
                 </div>
-
-                {/* Scrollable Target Passage Box with Active Cursor Auto-Scroll */}
+              ) : (
                 <div
-                  ref={contentContainerRef}
+                  className="card shadow-md"
                   style={{
-                    flex: 1,
-                    fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace',
-                    fontSize: '1.15rem',
-                    lineHeight: 1.85,
-                    letterSpacing: '0.02em',
-                    padding: '1.25rem',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    userSelect: 'none',
-                    overflowY: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    cursor: 'text',
+                    padding: '1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: '#ffffff',
+                    height: '540px',
                   }}
-                  onClick={() => inputRef.current?.focus()}
                 >
-                  {selectedContent.content.split('').map((char, index) => {
-                    const state = charStates[index] || 'idle';
-                    let color = '#718096';
-                    let bg = 'transparent';
-                    let borderBottom = 'none';
-
-                    if (state === 'correct') {
-                      color = '#15803d';
-                      bg = '#dcfce7';
-                    } else if (state === 'wrong') {
-                      color = '#b91c1c';
-                      bg = '#fee2e2';
-                      borderBottom = '2px solid #ef4444';
-                    } else if (state === 'current') {
-                      color = '#ffffff';
-                      bg = 'var(--color-secondary, #044C94)';
-                    }
-
-                    return (
-                      <span
-                        key={index}
-                        ref={state === 'current' ? activeCharRef : undefined}
-                        style={{
-                          color,
-                          backgroundColor: bg,
-                          borderBottom,
-                          borderRadius: '2px',
-                          padding: '0 1px',
-                          boxShadow: state === 'current' ? '0 0 0 2px rgba(4, 76, 148, 0.35)' : 'none',
-                        }}
-                      >
-                        {char}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem',
+                      paddingBottom: '0.75rem',
+                      borderBottom: '1px solid #edf2f7',
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-muted)', letterSpacing: '0.05em' }}>
+                        Reference Passage
                       </span>
-                    );
-                  })}
-                </div>
+                      <h2 className="text-h3" style={{ color: 'var(--color-secondary)', marginTop: '0.15rem' }}>
+                        {selectedContent.title}
+                      </h2>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {isDischargeSummaryContent(selectedContent.title, selectedContent.content) && (
+                        <button
+                          type="button"
+                          onClick={() => setChartViewMode('CHART')}
+                          className="btn btn-sm btn-outline"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#044C94', color: '#044C94' }}
+                        >
+                          📄 Hospital Chart View
+                        </button>
+                      )}
+                      <span className="badge badge-teal">
+                        {selectedContent.category && typeof selectedContent.category === 'object' ? selectedContent.category.name : 'Category'}
+                      </span>
+                      <span className="badge badge-accent">
+                        {selectedContent.wordCount} words
+                      </span>
+                    </div>
+                  </div>
 
-                <div
-                  style={{
-                    marginTop: '0.75rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontSize: 'var(--text-meta)',
-                    color: 'var(--color-muted)',
-                  }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Lightbulb size={14} strokeWidth={1.5} /> Click anywhere on text to focus typing input</span>
-                  <span>Auto-scrolls as you type</span>
+                  {/* Scrollable Target Passage Box with Active Cursor Auto-Scroll */}
+                  <div
+                    ref={contentContainerRef}
+                    style={{
+                      flex: 1,
+                      fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace',
+                      fontSize: '1.15rem',
+                      lineHeight: 1.85,
+                      letterSpacing: '0.02em',
+                      padding: '1.25rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      userSelect: 'none',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      cursor: 'text',
+                    }}
+                    onClick={() => inputRef.current?.focus()}
+                  >
+                    {selectedContent.content.split('').map((char, index) => {
+                      const state = charStates[index] || 'idle';
+                      let color = '#718096';
+                      let bg = 'transparent';
+                      let borderBottom = 'none';
+
+                      if (state === 'correct') {
+                        color = '#15803d';
+                        bg = '#dcfce7';
+                      } else if (state === 'wrong') {
+                        color = '#b91c1c';
+                        bg = '#fee2e2';
+                        borderBottom = '2px solid #ef4444';
+                      } else if (state === 'current') {
+                        color = '#ffffff';
+                        bg = 'var(--color-secondary, #044C94)';
+                      }
+
+                      return (
+                        <span
+                          key={index}
+                          ref={state === 'current' ? activeCharRef : undefined}
+                          style={{
+                            color,
+                            backgroundColor: bg,
+                            borderBottom,
+                            borderRadius: '2px',
+                            padding: '0 1px',
+                            boxShadow: state === 'current' ? '0 0 0 2px rgba(4, 76, 148, 0.35)' : 'none',
+                          }}
+                        >
+                          {char}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: 'var(--text-meta)',
+                      color: 'var(--color-muted)',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Lightbulb size={14} strokeWidth={1.5} /> Click anywhere on text to focus typing input</span>
+                    <span>Auto-scrolls as you type</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Right Column: Writing Input Field */}
               <div
@@ -913,6 +955,17 @@ export default function FreePracticePage() {
               </div>
 
               {/* Action Buttons */}
+              {selectedContent && isDischargeSummaryContent(selectedContent.title, selectedContent.content) && (
+                <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem', marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                    <CheckCircle size={15} /> Clinical Medical Record Completed
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#15803d', marginTop: '0.2rem' }}>
+                    Clinical Precision Score: <strong>{resultData.accuracy}%</strong> · All diagnostics, abbreviations, and numerical lab values verified.
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => {

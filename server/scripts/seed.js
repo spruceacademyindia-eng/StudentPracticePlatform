@@ -143,6 +143,49 @@ const seedData = async () => {
 
     // 4. Seed Typing Content
     console.log('🌱 Seeding Typing Content...');
+    const clinicalDischargeReport = await TypingContent.create({
+      title: 'Clinical Discharge Summary — Spinal Stenosis & Decubitus Ulcer',
+      description: 'Official clinical hospital discharge record with diagnoses, CT spine, cardiac echo, CXR, and laboratory panels.',
+      content: `DISCHARGE SUMMARY:
+
+Date of Service:
+Admit Date:
+Discharge Date:
+Admitting Diagnosis: bilateral leg weakness, UTI
+
+Discharge diagnosis/Discharge condition: severe spinal stenosis, bilateral gluteal decubitus ulcer, stage II, UTI
+
+Secondary Diagnoses: hyponatremia, diastolic heart failure
+
+Attending MD: Dr. XXXXX
+
+Consultations: none
+
+Labs/Imaging: CT Scan of head without contrast: no acute intracranial abnormality.
+CT scan of lumbar spine: There is extensive spondylosis with multilevel prominent osteophytes and disc space narrowing. There is also facet arthropathy. Compression fracture are seen at T12 and L1. There is approximately 20% ant. Wedge compression at both levels. The chronicity is uncertain although there is a fracture line transverse the ant. Superior endplate of L1 suggesting of fracture fragments.
+
+Cardiac echo: EF 75%, normal left ventricular wall thickness with normal left ventricular size and systolic function. Moderately dilated left atrium. Heavy mitral annular calcification is present. Cannot exclude prostatic mitral valve. Clinical correlation is needed. Mild to moderate tricuspid regurgitation with a calculated RSVP of 48 mmHG.
+
+CXR: 1/9: lungs are hypoventilated without pneumothorax, opacities overlying both lower lobes is consistent to small to moderate bilateral effusions with underlying atelectasis and/or infiltrate, large greater that right.
+CXR: 1/6: heart is enlarged, moderate right pleural effusion is present, small left pleural effusion is present, and findings suggestive of congestive heart failure.
+Echo: EF 75%, normal left ventricular wall thickness with normal left ventricular size and systolic function. Moderately dilated left atrium. Heavy mitral annular calcification is present. Can not exclude prostatic mitral valve. Clinical correlation is needed.
+Labs: CBC: 11.8/10.1/32.4/186
+BMP: 129/4.1/91/29/17/1.3, albumin 2.6
+Urine culture: S. Aureus, Coagulase negative
+
+Hospital Course
+Patient admitted for acute onset of bilateral leg weakness, UTI and bilateral gluteal decubitus ulcer.
+For bilateral leg weakness: CT scan of head and lumbar spine reports as above. Patient has several spinal stenosis and facet diseases that prevent her from walking anymore. Family declined further surgery intervention and agrees with disposition to skilled nursing facility.`,
+      category: catHealthcare._id,
+      subcategory: subDischarge._id,
+      mode: 'BOTH',
+      difficulty: 'HARD',
+      targetWPM: 35,
+      minimumAccuracy: 85,
+      status: 'ACTIVE',
+      createdBy: admin._id,
+    });
+
     const content1 = await TypingContent.create({
       title: 'Inpatient Cardiology Discharge Summary',
       description: 'Clinical summary for a patient treated for acute coronary syndrome.',

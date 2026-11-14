@@ -11,7 +11,9 @@ import {
   type TypingContent,
 } from '@/lib/services';
 import Navbar from '@/components/Navbar';
-import { Zap, ClipboardList, Check, Rocket, Lightbulb } from 'lucide-react';
+import { Zap, ClipboardList, Check, Rocket, Lightbulb, CheckCircle } from 'lucide-react';
+import ClinicalDocumentView from '@/components/ClinicalDocumentView';
+import { isDischargeSummaryContent } from '@/lib/clinicalTemplates';
 
 type CharState = 'idle' | 'correct' | 'wrong' | 'current';
 type AssessmentStatus = 'select' | 'running' | 'completed';
@@ -37,6 +39,7 @@ export default function ChallengeMePage() {
   const [liveAccuracy, setLiveAccuracy] = useState(100);
   const [submitting, setSubmitting] = useState(false);
   const [resultMetrics, setResultMetrics] = useState<any>(null);
+  const [chartViewMode, setChartViewMode] = useState<'CHART' | 'MONO'>('CHART');
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -645,116 +648,155 @@ export default function ChallengeMePage() {
               }}
             >
               {/* Left Column: Target Reference Passage */}
-              <div
-                className="card shadow-md"
-                style={{
-                  padding: '1.5rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  backgroundColor: '#ffffff',
-                  height: '540px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '1rem',
-                    paddingBottom: '0.75rem',
-                    borderBottom: '1px solid #edf2f7',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-muted)', letterSpacing: '0.05em' }}>
-                      Target Challenge Text
-                    </span>
-                    <h2 className="text-h3" style={{ color: 'var(--color-secondary)', marginTop: '0.15rem' }}>
-                      {selectedContent.title}
-                    </h2>
+              {isDischargeSummaryContent(selectedContent.title, selectedContent.content) && chartViewMode === 'CHART' ? (
+                <div style={{ height: '540px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setChartViewMode('MONO')}
+                      className="btn btn-sm btn-ghost"
+                      style={{ fontSize: '0.72rem', color: '#64748b' }}
+                    >
+                      Switch to Clean Monospace View →
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <span className="badge badge-teal">
-                      Target: {targetWPM} WPM
-                    </span>
-                    <span className="badge badge-accent">
-                      Min Acc: {selectedContent.minimumAccuracy}%
-                    </span>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <ClinicalDocumentView
+                      content={selectedContent.content}
+                      charStates={charStates}
+                      title={selectedContent.title}
+                      studentName="Candidate Student"
+                      targetWPM={targetWPM}
+                      mode="CHALLENGE"
+                      containerRef={contentContainerRef}
+                      activeCharRef={activeCharRef}
+                      onContainerClick={() => inputRef.current?.focus()}
+                      hospitalName="Ace Discharge Summary"
+                    />
                   </div>
                 </div>
-
-                {/* Scrollable Target Box */}
+              ) : (
                 <div
-                  ref={contentContainerRef}
+                  className="card shadow-md"
                   style={{
-                    flex: 1,
-                    fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace',
-                    fontSize: '1.15rem',
-                    lineHeight: 1.85,
-                    letterSpacing: '0.02em',
-                    padding: '1.25rem',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    userSelect: 'none',
-                    overflowY: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    cursor: 'text',
+                    padding: '1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: '#ffffff',
+                    height: '540px',
                   }}
-                  onClick={() => inputRef.current?.focus()}
                 >
-                  {selectedContent.content.split('').map((char, index) => {
-                    const state = charStates[index] || 'idle';
-                    let color = '#718096';
-                    let bg = 'transparent';
-                    let borderBottom = 'none';
-
-                    if (state === 'correct') {
-                      color = '#15803d';
-                      bg = '#dcfce7';
-                    } else if (state === 'wrong') {
-                      color = '#b91c1c';
-                      bg = '#fee2e2';
-                      borderBottom = '2px solid #ef4444';
-                    } else if (state === 'current') {
-                      color = '#ffffff';
-                      bg = 'var(--color-secondary, #044C94)';
-                    }
-
-                    return (
-                      <span
-                        key={index}
-                        ref={state === 'current' ? activeCharRef : undefined}
-                        style={{
-                          color,
-                          backgroundColor: bg,
-                          borderBottom,
-                          borderRadius: '2px',
-                          padding: '0 1px',
-                          boxShadow: state === 'current' ? '0 0 0 2px rgba(4, 76, 148, 0.35)' : 'none',
-                        }}
-                      >
-                        {char}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem',
+                      paddingBottom: '0.75rem',
+                      borderBottom: '1px solid #edf2f7',
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-muted)', letterSpacing: '0.05em' }}>
+                        Target Challenge Text
                       </span>
-                    );
-                  })}
-                </div>
+                      <h2 className="text-h3" style={{ color: 'var(--color-secondary)', marginTop: '0.15rem' }}>
+                        {selectedContent.title}
+                      </h2>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {isDischargeSummaryContent(selectedContent.title, selectedContent.content) && (
+                        <button
+                          type="button"
+                          onClick={() => setChartViewMode('CHART')}
+                          className="btn btn-sm btn-outline"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#044C94', color: '#044C94' }}
+                        >
+                          📄 Hospital Chart View
+                        </button>
+                      )}
+                      <span className="badge badge-teal">
+                        Target: {targetWPM} WPM
+                      </span>
+                      <span className="badge badge-accent">
+                        Min Acc: {selectedContent.minimumAccuracy}%
+                      </span>
+                    </div>
+                  </div>
 
-                <div
-                  style={{
-                    marginTop: '0.75rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontSize: 'var(--text-meta)',
-                    color: 'var(--color-muted)',
-                  }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Lightbulb size={14} strokeWidth={1.5} /> Click anywhere on passage to focus typing</span>
-                  <span>Auto-scrolls with cursor</span>
+                  {/* Scrollable Target Box */}
+                  <div
+                    ref={contentContainerRef}
+                    style={{
+                      flex: 1,
+                      fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace',
+                      fontSize: '1.15rem',
+                      lineHeight: 1.85,
+                      letterSpacing: '0.02em',
+                      padding: '1.25rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      userSelect: 'none',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      cursor: 'text',
+                    }}
+                    onClick={() => inputRef.current?.focus()}
+                  >
+                    {selectedContent.content.split('').map((char, index) => {
+                      const state = charStates[index] || 'idle';
+                      let color = '#718096';
+                      let bg = 'transparent';
+                      let borderBottom = 'none';
+
+                      if (state === 'correct') {
+                        color = '#15803d';
+                        bg = '#dcfce7';
+                      } else if (state === 'wrong') {
+                        color = '#b91c1c';
+                        bg = '#fee2e2';
+                        borderBottom = '2px solid #ef4444';
+                      } else if (state === 'current') {
+                        color = '#ffffff';
+                        bg = 'var(--color-secondary, #044C94)';
+                      }
+
+                      return (
+                        <span
+                          key={index}
+                          ref={state === 'current' ? activeCharRef : undefined}
+                          style={{
+                            color,
+                            backgroundColor: bg,
+                            borderBottom,
+                            borderRadius: '2px',
+                            padding: '0 1px',
+                            boxShadow: state === 'current' ? '0 0 0 2px rgba(4, 76, 148, 0.35)' : 'none',
+                          }}
+                        >
+                          {char}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: 'var(--text-meta)',
+                      color: 'var(--color-muted)',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Lightbulb size={14} strokeWidth={1.5} /> Click anywhere on passage to focus typing</span>
+                    <span>Auto-scrolls with cursor</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Right Column: Writing Input Field */}
               <div
@@ -903,7 +945,18 @@ export default function ChallengeMePage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            {selectedContent && isDischargeSummaryContent(selectedContent.title, selectedContent.content) && (
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.85rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <CheckCircle size={16} /> Clinical Transcription Assessment Validated
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#15803d', marginTop: '0.25rem' }}>
+                  Clinical Precision Score: <strong>{resultMetrics.accuracy}%</strong> · All medical terminology, Joint Commission abbreviation rules, and diagnostic numbers evaluated.
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={resetChallenge} className="btn btn-primary">
                 Try Another Challenge
               </button>
